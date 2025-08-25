@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Essay/Hausarbeit Architekt</title>
+<style>
+/* Basic styles */
+:root{
+  --bg:#f4f4f4; --fg:#222; --accent:#2b6cb0; --danger:#c53030;
+  font-family:system-ui, sans-serif;
+}
+body{background:var(--bg);color:var(--fg);margin:0;}
+header,footer{padding:1rem;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.1);}
+main{padding:1rem;max-width:1200px;margin:auto;}
+button{padding:.5rem 1rem;margin:.25rem;border:1px solid #ccc;background:#fff;cursor:pointer;}
+button.primary{background:var(--accent);color:#fff;border:none;}
+.hidden{display:none;}
+nav{margin-bottom:1rem;}
+section{margin-bottom:2rem;}
+table{width:100%;border-collapse:collapse;}
+th,td{border:1px solid #ccc;padding:.25rem;}
+#timerDisplay{font-size:3rem;text-align:center;margin:1rem 0;}
+#nudgeOverlay{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);color:#fff;font-size:2rem;opacity:0;pointer-events:none;transition:opacity .5s;}
+#nudgeOverlay.visible{opacity:1;pointer-events:auto;}
+#noiseToggle{margin-left:1rem;}
+/* Dark theme */
+@media (prefers-color-scheme:dark){
+  :root{--bg:#1a202c;--fg:#edf2f7;--accent:#63b3ed;}
+  button{background:#2d3748;color:var(--fg);border:1px solid #4a5568;}
+  header,footer{background:#2d3748;color:var(--fg);}
+  table,th,td{border-color:#4a5568;}
+}
+</style>
+</head>
+<body>
+<header>
+  <strong>Essay/Hausarbeit Architekt</strong>
+  <span id="miniKPI" style="margin-left:1rem;"></span>
+  <span style="float:right;">
+    <button id="saveBtn">Speichern</button>
+    <button id="loadBtn">Laden</button>
+    <button id="resetBtn">Zurücksetzen</button>
+  </span>
+</header>
+<main>
+  <!-- Start Hub -->
+  <section id="hubView" class="view">
+    <h1>Start-Hub</h1>
+    <button class="primary" id="startFocusBtn">Fokus starten</button>
+    <button id="overviewBtn">Überblick</button>
+    <button id="planBtn">Plan/Setup</button>
+    <div id="quickCapture">
+      <h3>Quick Capture</h3>
+      <input type="text" id="captureInput" placeholder="Gedanke/Task"/>
+      <button id="captureAdd">Speichern</button>
+      <ul id="laterList"></ul>
+    </div>
+  </section>
+
+  <!-- Overview -->
+  <section id="overviewView" class="view hidden">
+    <nav><button id="backFromOverview">Zurück</button></nav>
+    <h1>Überblick</h1>
+    <div id="countdown"></div>
+    <div id="riskLamp"></div>
+    <div id="todayPrior"></div>
+    <div id="chapterProgress"></div>
+  </section>
+
+  <!-- Plan/Setup -->
+  <section id="planView" class="view hidden">
+    <nav><button id="backFromPlan">Zurück</button></nav>
+    <h1>Plan & Setup</h1>
+    <div id="setup">
+      <h2>Setup Assistent</h2>
+      <div id="setupStep1" class="setupStep">
+        <h3>1) Rahmen</h3>
+        <label>Thema <input id="metaTheme"/></label><br/>
+        <label>Fragen <input id="metaQuestions"/></label><br/>
+        <label>These <input id="metaThesis"/></label><br/>
+        <label>Abgabe <input type="date" id="metaDue"/></label><br/>
+        <label>Stil <select id="metaStyle"><option>APA</option><option>Chicago</option><option>MLA</option></select></label><br/>
+        <button id="toStep2">Weiter</button>
+      </div>
+      <div id="setupStep2" class="setupStep hidden">
+        <h3>2) Methode & Korpus</h3>
+        <label>Methode <input id="metaMethod"/></label><br/>
+        <label>Korpus <input id="metaCorpus"/></label><br/>
+        <button id="backTo1">Zurück</button>
+        <button id="toStep3">Weiter</button>
+      </div>
+      <div id="setupStep3" class="setupStep hidden">
+        <h3>3) Struktur</h3>
+        <label>Kapitel (4-12)<br/><textarea id="chapterSchema" placeholder="Einleitung:10\nMethode:20..." rows="4"></textarea></label><br/>
+        <label>Evidenz-Ziel min/max <input id="eviMin" size="3"/>/<input id="eviMax" size="3"/></label><br/>
+        <button id="backTo2">Zurück</button>
+        <button id="finishSetup">Fertig</button>
+      </div>
+    </div>
+    <hr/>
+    <div id="planningSections" class="hidden">
+      <h2>Planungs-Abschnitte</h2>
+      <details open><summary>1) Zielbild</summary>
+        <textarea id="zielbild" rows="5" placeholder="Problem, Lücke, Beitrag, Risiko, Relevanz"></textarea>
+      </details>
+      <details><summary>2) Scope & Begriffe</summary>
+        <textarea id="scope" rows="4" placeholder="Scope/Ausschlüsse"></textarea>
+        <table id="defsTable"><tr><th>Begriff</th><th>Definition</th><th>Anker</th></tr></table>
+        <button id="addDef">+ Begriff</button>
+      </details>
+      <details><summary>3) Struktur & Wortbudget</summary>
+        <table id="chaptersTable"><tr><th>Name</th><th>%</th><th>Funktion</th><th>Notizen</th></tr></table>
+      </details>
+      <!-- further sections can be added similarly -->
+    </div>
+  </section>
+
+  <!-- Focus Mode -->
+  <section id="focusView" class="view hidden">
+    <nav><button id="backFromFocus">Zurück</button></nav>
+    <h1>Fokus-Modus</h1>
+    <div id="startRitual">
+      <h2>Start-Ritual</h2>
+      <select id="exerciseSelect">
+        <option value="box">Box Breathing</option>
+        <option value="sigh">Physiologischer Seufzer</option>
+        <option value="ground">5-4-3-2-1 Grounding</option>
+      </select>
+      <button id="startExercise">Übung starten</button>
+      <div id="exerciseTimer"></div>
+    </div>
+    <div id="pomodoro">
+      <h2>Pomodoro</h2>
+      <select id="presetSelect">
+        <option value="25/5">25/5</option>
+        <option value="50/10">50/10</option>
+        <option value="90/20">90/20</option>
+      </select>
+      <button id="timerStart">Start</button>
+      <button id="timerPause">Pause</button>
+      <button id="timerReset">Reset</button>
+      <button id="timerSkip">Skip</button>
+      <label><input type="checkbox" id="autoStart"/>Auto-Start</label>
+      <label id="noiseToggle"><input type="checkbox" id="noiseOn"/>Noise</label>
+      <input type="range" id="noiseVol" min="0" max="1" step="0.01" value="0.2"/>
+      <div id="timerDisplay">00:00</div>
+    </div>
+    <div id="nudgeOverlay"></div>
+  </section>
+</main>
+<footer>
+  <small>&copy; 2024 Essay Architekt</small>
+</footer>
+<script>
+/*
+Version: 0.1 (2024-XX-XX)
+Features: Start-Hub, Setup-Assistent, Planungs-Abschnitte 1-3, Fokus-Modus mit Pomodoro, Noise, Nudges, Quick Capture, localStorage Persistenz.
+Shortcuts: Space=Start/Pause, N=Next, R=Reset, F=Fullscreen, J=Quick Capture
+Pausen-Packs: default kurz (Augen+Haltung), lang (Atmung+Bewegung)
+*/
+const $ = sel=>document.querySelector(sel);
+const state = JSON.parse(localStorage.getItem('essayArchitekt')||'{}');
+const defaultState={meta:{},chapters:[],defs:[],laterList:[],focusLog:[],nudgeLog:[],focusPrefs:{preset:'25/5',custom:{},volume:0.2,noise:false},ui:{lastView:'hub'}};
+Object.assign(state,defaultState,state);
+function save(){localStorage.setItem('essayArchitekt',JSON.stringify(state));}
+function show(view){document.querySelectorAll('.view').forEach(v=>v.classList.add('hidden'));$('#'+view).classList.remove('hidden');state.ui.lastView=view;save();}
+window.addEventListener('load',()=>{show(state.ui.lastView||'hubView');renderLaterList();updateMiniKPI();});
+
+// Navigation
+$('#startFocusBtn').onclick=()=>show('focusView');
+$('#overviewBtn').onclick=()=>show('overviewView');
+$('#planBtn').onclick=()=>show('planView');
+$('#backFromOverview').onclick=()=>show('hubView');
+$('#backFromPlan').onclick=()=>show('hubView');
+$('#backFromFocus').onclick=()=>show('hubView');
+
+// Quick Capture
+$('#captureAdd').onclick=()=>{const t=$('#captureInput').value.trim();if(t){state.laterList.push({ts:Date.now(),text:t});$('#captureInput').value='';renderLaterList();save();}};
+function renderLaterList(){const ul=$('#laterList');ul.innerHTML='';state.laterList.forEach(item=>{const li=document.createElement('li');li.textContent=item.text;ul.appendChild(li);});}
+
+// Setup Assistant
+$('#toStep2').onclick=()=>{$('#setupStep1').classList.add('hidden');$('#setupStep2').classList.remove('hidden');};
+$('#backTo1').onclick=()=>{$('#setupStep2').classList.add('hidden');$('#setupStep1').classList.remove('hidden');};
+$('#toStep3').onclick=()=>{$('#setupStep2').classList.add('hidden');$('#setupStep3').classList.remove('hidden');};
+$('#backTo2').onclick=()=>{$('#setupStep3').classList.add('hidden');$('#setupStep2').classList.remove('hidden');};
+$('#finishSetup').onclick=()=>{
+  state.meta={theme:$('#metaTheme').value,questions:$('#metaQuestions').value,thesis:$('#metaThesis').value,due:$('#metaDue').value,style:$('#metaStyle').value,method:$('#metaMethod').value,corpus:$('#metaCorpus').value};
+  // parse chapters
+  state.chapters=[];$('#chapterSchema').value.split(/\n+/).forEach(line=>{const [name,pct]=line.split(':');if(name&&pct)state.chapters.push({name:name.trim(),pct:+pct,progressPct:0});});
+  state.eviMin=$('#eviMin').value;state.eviMax=$('#eviMax').value;
+  save();$('#setup').classList.add('hidden');$('#planningSections').classList.remove('hidden');updateMiniKPI();};
+
+$('#addDef').onclick=()=>{const tr=document.createElement('tr');tr.innerHTML='<td><input></td><td><input></td><td><input></td>';$('#defsTable').appendChild(tr);};
+
+// Planning tables render
+function renderChapters(){const tbl=$('#chaptersTable');tbl.innerHTML='<tr><th>Name</th><th>%</th><th>Funktion</th><th>Notizen</th></tr>';state.chapters.forEach((c,i)=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${c.name}</td><td>${c.pct}</td><td><input data-i="${i}" data-k="function" value="${c.function||''}"></td><td><input data-i="${i}" data-k="notes" value="${c.notes||''}"></td>`;tbl.appendChild(tr);});}
+renderChapters();
+$('#chaptersTable').addEventListener('input',e=>{const i=e.target.dataset.i,k=e.target.dataset.k;state.chapters[i][k]=e.target.value;save();});
+
+// Mini KPI
+function updateMiniKPI(){if(state.meta.due){const days=Math.ceil((new Date(state.meta.due)-Date.now())/86400000);$('#miniKPI').textContent=`Tage bis Abgabe: ${days}`;}else $('#miniKPI').textContent='';}
+
+// Overview placeholders
+function renderOverview(){if(state.meta.due){const days=Math.ceil((new Date(state.meta.due)-Date.now())/86400000);$('#countdown').textContent=`Countdown: ${days} Tage`;}
+}
+$('#overviewView').addEventListener('show',renderOverview);
+
+// Focus Mode
+let timerInterval=null;let timerRemaining=0;let isBreak=false;let cycle=0;const audioCtx=new (window.AudioContext||window.webkitAudioContext)();let noiseNode=null;
+function startTimer(){let [focus,rest]=$('#presetSelect').value.split('/').map(Number);timerRemaining=(isBreak?rest:focus)*60;updateTimerDisplay();timerInterval=setInterval(()=>{timerRemaining--;updateTimerDisplay();if(timerRemaining<=0){clearInterval(timerInterval);isBreak=!isBreak;if(!isBreak)cycle++;if($('#autoStart').checked)startTimer();}},1000);}
+function updateTimerDisplay(){const m=Math.floor(timerRemaining/60).toString().padStart(2,'0');const s=(timerRemaining%60).toString().padStart(2,'0');$('#timerDisplay').textContent=`${m}:${s}`;}
+$('#timerStart').onclick=()=>{if(timerInterval)clearInterval(timerInterval);startTimer();};
+$('#timerPause').onclick=()=>{if(timerInterval){clearInterval(timerInterval);timerInterval=null;}};
+$('#timerReset').onclick=()=>{clearInterval(timerInterval);timerInterval=null;isBreak=false;cycle=0;$('#timerDisplay').textContent='00:00';};
+$('#timerSkip').onclick=()=>{clearInterval(timerInterval);isBreak=!isBreak;startTimer();};
+$('#presetSelect').value=state.focusPrefs.preset;
+$('#presetSelect').onchange=e=>{state.focusPrefs.preset=e.target.value;save();};
+$('#noiseOn').checked=state.focusPrefs.noise;
+$('#noiseVol').value=state.focusPrefs.volume;
+function toggleNoise(on){if(on){noiseNode=audioCtx.createBufferSource();const buffer=audioCtx.createBuffer(1, audioCtx.sampleRate*2, audioCtx.sampleRate);let data=buffer.getChannelData(0);for(let i=0;i<data.length;i++)data[i]=Math.random()*2-1;noiseNode.buffer=buffer;noiseNode.loop=true;const gain=audioCtx.createGain();gain.gain.value=$('#noiseVol').value;noiseNode.connect(gain).connect(audioCtx.destination);noiseNode.start();}else if(noiseNode){noiseNode.stop();noiseNode.disconnect();noiseNode=null;}}
+$('#noiseOn').onchange=e=>{state.focusPrefs.noise=e.target.checked;toggleNoise(e.target.checked);save();};
+$('#noiseVol').oninput=e=>{state.focusPrefs.volume=e.target.value;if(noiseNode)noiseNode.gainNode.gain.value=e.target.value;save();};
+
+// Nudges
+const nudgeTexts={eyes:['Blinzle 5× bewusst','Blick 20s in die Ferne'],posture:['Schultern sinken lassen','Kiefer lösen'],breath:['Langer Ausatmen (6s)'],water:['Kleiner Schluck Wasser'],distraction:['Gedanke? Ctrl+J → parken']};
+let nudgeTimer=null;function scheduleNudge(){const range=[180,420];const delay=Math.random()*(range[1]-range[0])+range[0];nudgeTimer=setTimeout(()=>{showNudge();scheduleNudge();},delay*1000);}function showNudge(){const cats=Object.keys(nudgeTexts);const cat=cats[Math.floor(Math.random()*cats.length)];const text=nudgeTexts[cat][Math.floor(Math.random()*nudgeTexts[cat].length)];const overlay=$('#nudgeOverlay');overlay.textContent=text;overlay.classList.add('visible');setTimeout(()=>overlay.classList.remove('visible'),6000);state.nudgeLog.push({ts:Date.now(),category:cat,text,action:'shown'});save();}
+$('#focusView').addEventListener('show',()=>{scheduleNudge();});
+$('#backFromFocus').addEventListener('click',()=>{clearTimeout(nudgeTimer);});
+
+// Exercise timer simple 60s
+$('#startExercise').onclick=()=>{let t=60;$('#exerciseTimer').textContent='60';const int=setInterval(()=>{t--;$('#exerciseTimer').textContent=t;if(t<=0)clearInterval(int);},1000);};
+
+// Keyboard shortcuts
+window.addEventListener('keydown',e=>{if(document.activeElement.tagName==='INPUT' || document.activeElement.tagName==='TEXTAREA')return;switch(e.key){case ' ':e.preventDefault();if(timerInterval)$('#timerPause').onclick();else $('#timerStart').onclick();break;case 'N':case 'n':$('#timerSkip').onclick();break;case 'R':case 'r':$('#timerReset').onclick();break;case 'J':case 'j':$('#captureInput').focus();break;}});
+
+// Save/Load/Reset
+$('#saveBtn').onclick=()=>{save();alert('Gespeichert');};
+$('#loadBtn').onclick=()=>{Object.assign(state,defaultState,JSON.parse(localStorage.getItem('essayArchitekt')||'{}'));renderLaterList();renderChapters();updateMiniKPI();alert('Geladen');};
+$('#resetBtn').onclick=()=>{if(confirm('Alles löschen?')){localStorage.removeItem('essayArchitekt');location.reload();}};
+</script>
+</body>
+</html>
